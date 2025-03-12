@@ -4,7 +4,7 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 
 from diffusion import Diffusion
-import torch
+import torch as th
 from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
@@ -18,10 +18,12 @@ import imageio
 
 # Tensorboard
 from torch.utils.tensorboard import SummaryWriter
+
 SAVE_IMAGE = True
 
-if __name__ == "__main__":
-    args = get_args()
+
+def train(args):
+    device = "cuda" if th.cuda.is_available() else "cpu"
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     writer = SummaryWriter(f"runs/{timestamp}")
     model_dir = f"models/{timestamp}"
@@ -30,29 +32,27 @@ if __name__ == "__main__":
     data_loader = DataLoader(
         dataset, batch_size=args.train_batch_size, shuffle=True, drop_last=True
     )
-
     model = Model(
         hidden_size=args.hidden_size,
         hidden_layers=args.hidden_layers,
         emb_size=args.embedding_size,
-        twoD_data=args.dataset != "mnist",
+        twoD_data=args.dataset != "mnist"
     )
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = model.to(device)
+    model.to(device)
     diffusion = Diffusion(num_timesteps=args.num_timesteps, device=device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
-    scheduler = torch.optim.lr_scheduler.LambdaLR(
+    optimizer = th.optim.AdamW(model.parameters(), lr=args.learning_rate)
+    scheduler = th.optim.lr_scheduler.LambdaLR(
         optimizer, lambda step: 1 - step / (args.num_epochs * len(data_loader))
     )
 
+    best_loss = float("inf")
     print("Training model...")
     for epoch in tqdm(range(args.num_epochs), desc="Epochs"):
         model.train()
         for batch in data_loader:
             x_0 = batch[0].to(device)
-            noise = torch.randn_like(x_0)
-            t = torch.randint(
+            noise = th.randn_like(x_0)
+            t = th.randint(
                 0, args.num_timesteps, (args.train_batch_size, 1), device=device
             )
             x_t = diffusion.diffusion(x_0, noise, t)
@@ -65,61 +65,78 @@ if __name__ == "__main__":
             optimizer.step()  # 更新模型参数
             scheduler.step()  # 更新学习率
 
-            if SAVE_IMAGE:
-                fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
-                ax1.scatter(x_0[:, 0].cpu(), x_0[:, 1].cpu(), alpha=0.5)
-                ax1.set_title('x_0')
-                ax2.scatter(x_t[:, 0].cpu(), x_t[:, 1].cpu(), alpha=0.5)
-                ax2.set_title(f'x_t')
-                # 将matplotlib图像转换为tensor
-                writer.add_figure('scatter_plot', fig, epoch)
-                plt.close(fig)
-                SAVE_IMAGE = False
+        if SAVE_IMAGE and args.dataset == "heart":
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+            ax1.scatter(x_0[:, 0].cpu(), x_0[:, 1].cpu(), alpha=0.5)
+            ax1.set_title("x_0")
+            ax2.scatter(x_t[:, 0].cpu(), x_t[:, 1].cpu(), alpha=0.5)
+            ax2.set_title("x_t")
+            writer.add_figure("scatter_plot", fig, epoch)
+            plt.close(fig)
 
         writer.add_scalar("loss", loss.detach().item(), epoch)
         writer.add_scalar("learning rate", scheduler.get_last_lr()[0], epoch)
 
+        # 记录最佳模型
+        if loss.detach().item() < best_loss:
+            best_loss = loss.detach().item()
+            best_weights = model.state_dict()
+
     print("Saving model...")
     os.makedirs(model_dir, exist_ok=True)
-    torch.save(model.state_dict(), f"{model_dir}/model.pth")
+    th.save(best_weights, f"{model_dir}/model_{args.dataset}.pth")
+    writer.close()
+    return model_dir
 
+
+def inference(model_dir, args):
     print("Evaluate & Save Animation")
-    x_t = torch.randn(args.eval_batch_size, model.data_size, device=device)
+    device = "cuda" if th.cuda.is_available() else "cpu"
+    model_weights = th.load(f"{model_dir}/model_{args.dataset}.pth", map_location=device, weights_only=True)
+    model = Model(
+        hidden_size=args.hidden_size,
+        hidden_layers=args.hidden_layers,
+        emb_size=args.embedding_size,
+        twoD_data=args.dataset != "mnist"
+    )
+    model.to(device)
+    model.load_state_dict(model_weights)
+    model.eval()
+
+    x_t = th.randn(args.eval_batch_size, model.data_size, device=device)
     timesteps = range(args.num_timesteps - 1, -1, -1)
     diffusion = Diffusion(num_timesteps=args.num_timesteps, device=device)
     denoise_process = []
-    denoise_process.append(x_t.to("cpu"))
+    denoise_process.append(x_t.cpu())
     for step, t in tqdm(enumerate(timesteps), desc="Sampling"):
-        t = torch.full((args.eval_batch_size, 1), t, device=device)
-        with torch.no_grad():
+        t = th.full((args.eval_batch_size, 1), t, device=device)
+        with th.no_grad():
             pred_noise = model(x_t, t)
+            x_t = diffusion.denoise(pred_noise, t, x_t)
 
-        x_t = diffusion.denoise(pred_noise, t, x_t)
         if step % args.show_image_step == 0:
-            denoise_process.append(x_t.to("cpu"))
+            denoise_process.append(x_t.cpu())
 
     if args.dataset != "mnist":
         # also show forward samples
         dataset = get_dataset(args.dataset, n=args.eval_batch_size)
         x_0 = dataset.tensors[0].to(device)
         diffusion_process = []
-        diffusion_process.append(x_0)
+        diffusion_process.append(x_0.cpu())
         for t in range(args.num_timesteps):
-            noise = torch.randn_like(x_0, device=device)
+            noise = th.randn_like(x_0, device=device)
             x_t = diffusion.diffusion(x_0, noise, t)
             if t % args.show_image_step == 0:
-                diffusion_process.append(x_t.to("cpu"))
+                diffusion_process.append(x_t.cpu())
 
         x_min, x_max = -6, 6
         y_min, y_max = -6, 6
         fig, ax = plt.subplots()
         camera = Camera(fig)
 
-        # for i, x in enumerate(diffusion_process + denoise_process):
-        for i, x in enumerate(denoise_process):
+        for i, x in enumerate(diffusion_process + denoise_process):
             plt.scatter(x[:, 0], x[:, 1], alpha=0.5, s=15, color="red")
-            # timesteps = i if i < len(diffusion_process) else i - len(diffusion_process)
-            t = i
+            t = i if i < args.num_timesteps else i - args.num_timesteps
             ax.text(
                 0.0,
                 0.95,
@@ -129,7 +146,7 @@ if __name__ == "__main__":
             ax.text(
                 0.0,
                 1.01,
-                "Denoise" if i < len(diffusion_process) else "Denoise",
+                "Diffusion" if i < args.num_timesteps else "Denoise",
                 transform=ax.transAxes,
                 size=15,
             )
@@ -146,16 +163,23 @@ if __name__ == "__main__":
         # 让动画停留 30 帧
         n_hold_final = 30
         for _ in range(n_hold_final):
-            denoise_process.append(x_start)
+            denoise_process.append(x_t.cpu())
 
-        denoise_process = torch.stack(denoise_process, dim=0)
+        denoise_process = th.stack(denoise_process, dim=0)
         denoise_process = (denoise_process.clamp(-1, 1) + 1) / 2
-        denoise_process = (denoise_process * 255).type(torch.uint8)
+        denoise_process = (denoise_process * 255).type(th.uint8)
         denoise_process = denoise_process.reshape(-1, args.eval_batch_size, 28, 28)
-        denoise_process = list(torch.split(denoise_process, 1, dim=1))
+        denoise_process = list(th.split(denoise_process, 1, dim=1))
         for i in range(len(denoise_process)):
             denoise_process[i] = denoise_process[i].squeeze(1)
-        denoise_process = torch.cat(denoise_process, dim=-1)
+        denoise_process = th.cat(denoise_process, dim=-1)
         imageio.mimsave(
             f"{model_dir}/animation_mnist.gif", list(denoise_process), fps=5
         )
+
+
+if __name__ == "__main__":
+    args = get_args()
+    model_dir = train(args)
+    # model_dir = "models/20250312_161331"
+    inference(model_dir, args)

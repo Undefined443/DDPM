@@ -1,6 +1,5 @@
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+from torch import nn
 
 
 class Block(nn.Module):
@@ -58,12 +57,12 @@ class Model(nn.Module):
         layers.append(nn.Linear(hidden_size, self.data_size))
         self.joint_mlp = nn.Sequential(*layers)
 
-    def forward(self, x_t, t):
-        t_emb = self.time_emb(t)
+    def forward(self, x, t):
+        t = self.time_emb(t)
         if self.twoD_data:
-            x_emb = self.input_emb1(x_t[:, 0].unsqueeze(-1))
-            y_emb = self.input_emb2(x_t[:, 1].unsqueeze(-1))
-            x_t_emb = torch.cat((x_emb, y_emb), dim=-1)
-        x_t_emb = torch.cat((x_t_emb, t_emb), dim=-1)
-        x_start = self.joint_mlp(x_t_emb)
-        return x_start
+            x_emb = self.input_emb1(x[:, 0].unsqueeze(-1))
+            y_emb = self.input_emb2(x[:, 1].unsqueeze(-1))
+            x = torch.cat((x_emb, y_emb), dim=-1)
+        x = torch.cat((x, t), dim=-1)
+        x = self.joint_mlp(x)
+        return x
