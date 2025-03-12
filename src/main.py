@@ -36,7 +36,7 @@ def train(args):
         hidden_size=args.hidden_size,
         hidden_layers=args.hidden_layers,
         emb_size=args.embedding_size,
-        twoD_data=args.dataset != "mnist"
+        twoD_data=args.dataset != "mnist",
     )
     model.to(device)
     diffusion = Diffusion(num_timesteps=args.num_timesteps, device=device)
@@ -85,6 +85,7 @@ def train(args):
     print("Saving model...")
     os.makedirs(model_dir, exist_ok=True)
     th.save(best_weights, f"{model_dir}/model_{args.dataset}.pth")
+    writer.add_hparams(vars(args), {"loss": best_loss})
     writer.close()
     return model_dir
 
@@ -92,12 +93,14 @@ def train(args):
 def inference(model_dir, args):
     print("Evaluate & Save Animation")
     device = "cuda" if th.cuda.is_available() else "cpu"
-    model_weights = th.load(f"{model_dir}/model_{args.dataset}.pth", map_location=device, weights_only=True)
+    model_weights = th.load(
+        f"{model_dir}/model_{args.dataset}.pth", map_location=device, weights_only=True
+    )
     model = Model(
         hidden_size=args.hidden_size,
         hidden_layers=args.hidden_layers,
         emb_size=args.embedding_size,
-        twoD_data=args.dataset != "mnist"
+        twoD_data=args.dataset != "mnist",
     )
     model.to(device)
     model.load_state_dict(model_weights)
@@ -181,5 +184,4 @@ def inference(model_dir, args):
 if __name__ == "__main__":
     args = get_args()
     model_dir = train(args)
-    # model_dir = "models/20250312_161331"
     inference(model_dir, args)

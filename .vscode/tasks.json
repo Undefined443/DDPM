@@ -1,0 +1,85 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "heart",
+      "type": "shell",
+      "command": "${userHome}/.local/opt/miniforge3/envs/pytorch/bin/python",
+      "args": [
+        "src/main.py"
+      ],
+      "options": {
+        "env": {
+          "CUDA_VISIBLE_DEVICES": "${input:device}",
+          "PYTHONPATH": "${workspaceFolder}"
+        }
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "mnist",
+      "type": "shell",
+      "command": "${userHome}/.local/opt/miniforge3/envs/pytorch/bin/python",
+      "args": [
+        "src/main.py",
+        "--learning_rate",
+        "1e-3",
+        "--dataset",
+        "mnist",
+        "--train_batch_size",
+        "128",
+        "--eval_batch_size",
+        "10",
+        "--num_epochs",
+        "200",
+        "--num_timesteps",
+        "1000",
+        "--embedding_size",
+        "100",
+        "--hidden_size",
+        "2048",
+        "--hidden_layers",
+        "5",
+        "--show_image_step",
+        "50"
+      ],
+      "options": {
+        "env": {
+          "CUDA_VISIBLE_DEVICES": "${input:device}",
+          "PYTHONPATH": "${workspaceFolder}"
+        }
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "dataset",
+      "description": "Select the dataset",
+      "type": "pickString",
+      "default": "heart",
+      "options": [
+        "mnist",
+        "heart"
+      ]
+    },
+    {
+      "id": "eval_batch_size",
+      "description": "Enter the evaluation batch size",
+      "type": "promptString",
+      "default": "1000"
+    },
+    {
+      "id": "device",
+      "description": "Select the device",
+      "type": "promptString",
+      "default": "0"
+    }
+  ]
+}
