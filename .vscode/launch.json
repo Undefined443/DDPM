@@ -10,8 +10,9 @@
       "justMyCode": true,
       "args": [],
       "env": {
-          "CUDA_VISIBLE_DEVICES": "${input:device}",
-          "PYTHONPATH": "${workspaceFolder}"
+          "CUDA_VISIBLE_DEVICES": "${input:CUDA_VISIBLE_DEVICES}",
+          "PYTHONPATH": "${workspaceFolder}",
+          "cwd": "${workspaceFolder}/src"
       }
     },
     {
@@ -22,7 +23,6 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": [
-        "src/main.py",
         "--learning_rate",
         "1e-3",
         "--dataset",
@@ -45,15 +45,16 @@
         "50"
       ],
       "env": {
-        "CUDA_VISIBLE_DEVICES": "${input:device}",
-        "PYTHONPATH": "${workspaceFolder}"
+        "CUDA_VISIBLE_DEVICES": "${input:CUDA_VISIBLE_DEVICES}",
+        "PYTHONPATH": "${workspaceFolder}",
+        "cwd": "${workspaceFolder}/src"
       }
     }
   ],
   "inputs": [
     {
       "id": "dataset",
-      "description": "Select the dataset",
+      "description": "dataset",
       "type": "pickString",
       "default": "heart",
       "options": [
@@ -63,13 +64,13 @@
     },
     {
       "id": "eval_batch_size",
-      "description": "Enter the evaluation batch size",
+      "description": "eval_batch_size",
       "type": "promptString",
       "default": "1000"
     },
     {
-      "id": "device",
-      "description": "Select the device",
+      "id": "CUDA_VISIBLE_DEVICES",
+      "description": "CUDA_VISIBLE_DEVICES",
       "type": "promptString",
       "default": "0"
     }

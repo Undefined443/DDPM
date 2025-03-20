@@ -8,7 +8,7 @@ import torch as th
 from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
-from model import Model
+from model import ToyModel
 from utils import get_dataset
 from utils import get_args
 
@@ -19,20 +19,20 @@ import imageio
 # Tensorboard
 from torch.utils.tensorboard import SummaryWriter
 
-SAVE_IMAGE = True
-
 
 def train(args):
+    SAVE_IMAGE = True
     device = "cuda" if th.cuda.is_available() else "cpu"
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     writer = SummaryWriter(f"runs/{timestamp}")
-    model_dir = f"models/{timestamp}"
+    model_dir = f"ckpts/{timestamp}"
 
     dataset = get_dataset(args.dataset)
-    data_loader = DataLoader(
+    dataloader = DataLoader(
         dataset, batch_size=args.train_batch_size, shuffle=True, drop_last=True
     )
-    model = Model(
+
+    model = ToyModel(
         hidden_size=args.hidden_size,
         hidden_layers=args.hidden_layers,
         emb_size=args.embedding_size,
@@ -42,14 +42,14 @@ def train(args):
     diffusion = Diffusion(num_timesteps=args.num_timesteps, device=device)
     optimizer = th.optim.AdamW(model.parameters(), lr=args.learning_rate)
     scheduler = th.optim.lr_scheduler.LambdaLR(
-        optimizer, lambda step: 1 - step / (args.num_epochs * len(data_loader))
+        optimizer, lambda step: 1 - step / (args.num_epochs * len(dataloader))
     )
 
     best_loss = float("inf")
     print("Training model...")
     for epoch in tqdm(range(args.num_epochs), desc="Epochs"):
         model.train()
-        for batch in data_loader:
+        for batch in dataloader:
             x_0 = batch[0].to(device)
             noise = th.randn_like(x_0)
             t = th.randint(
@@ -57,13 +57,13 @@ def train(args):
             )
             x_t = diffusion.diffusion(x_0, noise, t)
 
-            pred_noise = model(x_t, t)  # 预测噪声
-            loss = F.mse_loss(pred_noise, noise)  # 计算损失
-            optimizer.zero_grad()  # 清空梯度
-            loss.backward()  # 反向传播（计算梯度）
+            pred_noise = model(x_t, t)                         # 预测噪声
+            loss = F.mse_loss(pred_noise, noise)               # 计算损失
+            optimizer.zero_grad()                              # 清空梯度
+            loss.backward()                                    # 反向传播（计算梯度）
             nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # 梯度裁剪
-            optimizer.step()  # 更新模型参数
-            scheduler.step()  # 更新学习率
+            optimizer.step()                                   # 更新模型参数
+            scheduler.step()                                   # 更新学习率
 
         if SAVE_IMAGE and args.dataset == "heart":
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
@@ -73,9 +73,17 @@ def train(args):
             ax2.set_title("x_t")
             writer.add_figure("scatter_plot", fig, epoch)
             plt.close(fig)
+            SAVE_IMAGE = False
 
         writer.add_scalar("loss", loss.detach().item(), epoch)
         writer.add_scalar("learning rate", scheduler.get_last_lr()[0], epoch)
+        for name, param in model.named_parameters():
+            writer.add_histogram(f"params/{name}", param, epoch)
+            if param.grad is not None:
+                writer.add_histogram(f"grads/{name}", param.grad, epoch)
+        if hasattr(model, 'time_embed'):
+            t_embed = model.time_embed(t)
+            writer.add_embedding(t_embed, metadata=t.squeeze().tolist(), tag='time_embedding', global_step=epoch)
 
         # 记录最佳模型
         if loss.detach().item() < best_loss:
@@ -85,7 +93,9 @@ def train(args):
     print("Saving model...")
     os.makedirs(model_dir, exist_ok=True)
     th.save(best_weights, f"{model_dir}/model_{args.dataset}.pth")
+    writer.add_graph(model, (x_0, t))
     writer.add_hparams(vars(args), {"loss": best_loss})
+    
     writer.close()
     return model_dir
 
@@ -96,7 +106,7 @@ def inference(model_dir, args):
     model_weights = th.load(
         f"{model_dir}/model_{args.dataset}.pth", map_location=device, weights_only=True
     )
-    model = Model(
+    model = ToyModel(
         hidden_size=args.hidden_size,
         hidden_layers=args.hidden_layers,
         emb_size=args.embedding_size,

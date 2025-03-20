@@ -1,4 +1,4 @@
-import torch
+import torch as th
 import torch.nn.functional as F
 
 
@@ -8,18 +8,18 @@ class Diffusion:
     ):
 
         self.num_timesteps = num_timesteps
-        self.betas = torch.linspace(
-            beta_start, beta_end, num_timesteps, dtype=torch.float32, device=device
+        self.betas = th.linspace(
+            beta_start, beta_end, num_timesteps, dtype=th.float32, device=device
         )
 
         self.alphas = 1.0 - self.betas
-        self.alphas_cumprod = torch.cumprod(self.alphas, dim=0)
+        self.alphas_cumprod = th.cumprod(self.alphas, dim=0)
         self.alphas_cumprod_prev = F.pad(self.alphas_cumprod[:-1], (1, 0), value=1.0)
 
         self.sqrt_alphas_cumprod = self.alphas_cumprod**0.5
         self.sqrt_one_minus_alphas_cumprod = (1 - self.alphas_cumprod) ** 0.5
 
-        self.sqrt_inv_alphas = torch.sqrt(1.0 / self.alphas)
+        self.sqrt_inv_alphas = th.sqrt(1.0 / self.alphas)
         self.noise_coef = self.betas / self.sqrt_one_minus_alphas_cumprod
         self.variance = (
             self.betas * (1.0 - self.alphas_cumprod_prev) / (1.0 - self.alphas_cumprod)
@@ -36,5 +36,5 @@ class Diffusion:
         coef1 = self.sqrt_inv_alphas[t]
         coef2 = self.noise_coef[t]
         coef3 = self.variance[t] ** 0.5
-        noise = torch.randn_like(pred_noise)
+        noise = th.randn_like(pred_noise)
         return coef1 * (x_t - coef2 * pred_noise) + coef3 * noise
