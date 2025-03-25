@@ -29,9 +29,7 @@ def train(args):
     model_dir = f"ckpts/{timestamp}"
 
     dataset = get_dataset(args.dataset)
-    dataloader = DataLoader(
-        dataset, batch_size=args.train_batch_size, shuffle=True, drop_last=True
-    )
+    dataloader = DataLoader(dataset, batch_size=args.train_batch_size, shuffle=True, drop_last=True)
 
     model = ToyModel(
         hidden_dim=args.hidden_dim,
@@ -42,9 +40,7 @@ def train(args):
     model.to(device)
     diffusion = Diffusion(num_timesteps=args.num_timesteps, device=device)
     optimizer = th.optim.AdamW(model.parameters(), lr=args.learning_rate)
-    scheduler = th.optim.lr_scheduler.LambdaLR(
-        optimizer, lambda step: 1 - step / (args.num_epochs * len(dataloader))
-    )
+    scheduler = th.optim.lr_scheduler.LambdaLR(optimizer, lambda step: 1 - step / (args.num_epochs * len(dataloader)))
 
     best_loss = float("inf")
     print("Training model...")
@@ -53,9 +49,7 @@ def train(args):
         for batch in dataloader:
             x_0 = batch[0].to(device)
             noise = th.randn_like(x_0)
-            t = th.randint(
-                0, args.num_timesteps, (args.train_batch_size, 1), device=device
-            )
+            t = th.randint(0, args.num_timesteps, (args.train_batch_size, 1), device=device)
             x_t = diffusion.diffusion(x_0, noise, t)
 
             pred_noise = model(x_t, t)                         # 预测噪声
@@ -82,9 +76,9 @@ def train(args):
             writer.add_histogram(f"params/{name}", param, epoch)
             if param.grad is not None:
                 writer.add_histogram(f"grads/{name}", param.grad, epoch)
-        if hasattr(model, 'time_embed'):
+        if hasattr(model, "time_embed"):
             t_embed = model.time_embed(t)
-            writer.add_embedding(t_embed, metadata=t.squeeze().tolist(), tag='time_embedding', global_step=epoch)
+            writer.add_embedding(t_embed, metadata=t.squeeze().tolist(), tag="time_embedding", global_step=epoch)
 
         # 记录最佳模型
         if loss.detach().item() < best_loss:
@@ -104,9 +98,7 @@ def train(args):
 def inference(model_dir, args):
     print("Evaluate & Save Animation")
     device = "cuda" if th.cuda.is_available() else "cpu"
-    model_weights = th.load(
-        f"{model_dir}/model_{args.dataset}.pth", map_location=device, weights_only=True
-    )
+    model_weights = th.load(f"{model_dir}/model_{args.dataset}.pth", map_location=device, weights_only=True)
     model = ToyModel(
         hidden_dim=args.hidden_dim,
         num_layers=args.num_layers,
@@ -187,16 +179,12 @@ def inference(model_dir, args):
         for i in range(len(denoise_process)):
             denoise_process[i] = denoise_process[i].squeeze(1)
         denoise_process = th.cat(denoise_process, dim=-1)
-        imageio.mimsave(
-            f"{model_dir}/animation_mnist.gif", list(denoise_process), fps=5
-        )
+        imageio.mimsave(f"{model_dir}/animation_mnist.gif", list(denoise_process), fps=5)
 
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--dataset", type=str, default="heart", choices=["heart", "mnist"]
-    )
+    parser.add_argument("--dataset", type=str, default="heart", choices=["heart", "mnist"])
     parser.add_argument("--train_batch_size", type=int, default=32)
     parser.add_argument("--eval_batch_size", type=int, default=1000)
     parser.add_argument("--num_epochs", type=int, default=100)
