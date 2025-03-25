@@ -2,6 +2,8 @@ import torch as th
 from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
+from torch.optim import AdamW
+from torch.optim.lr_scheduler import LambdaLR
 
 import os
 from tqdm import tqdm
@@ -39,8 +41,8 @@ def train(args):
     )
     model.to(device)
     diffusion = Diffusion(num_timesteps=args.num_timesteps, device=device)
-    optimizer = th.optim.AdamW(model.parameters(), lr=args.learning_rate)
-    scheduler = th.optim.lr_scheduler.LambdaLR(optimizer, lambda step: 1 - step / (args.num_epochs * len(dataloader)))
+    optimizer = AdamW(model.parameters(), lr=args.learning_rate)
+    scheduler = LambdaLR(optimizer, lambda step: 1 - step / (args.num_epochs * len(dataloader)))
 
     best_loss = float("inf")
     print("Training model...")
