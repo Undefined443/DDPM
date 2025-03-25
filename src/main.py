@@ -1,8 +1,7 @@
 import torch as th
 from torch import nn
-from torch.nn import functional as F
-from torch.utils.data import DataLoader
 from torch.optim import AdamW
+from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import LambdaLR
 
 import os
@@ -41,6 +40,7 @@ def train(args):
     )
     model.to(device)
     diffusion = Diffusion(num_timesteps=args.num_timesteps, device=device)
+    criterion = nn.MSELoss()
     optimizer = AdamW(model.parameters(), lr=args.learning_rate)
     scheduler = LambdaLR(optimizer, lambda step: 1 - step / (args.num_epochs * len(dataloader)))
 
@@ -55,7 +55,7 @@ def train(args):
             x_t = diffusion.diffusion(x_0, noise, t)
 
             pred_noise = model(x_t, t)                         # 预测噪声
-            loss = F.mse_loss(pred_noise, noise)               # 计算损失
+            loss = criterion(pred_noise, noise)               # 计算损失
             optimizer.zero_grad()                              # 清空梯度
             loss.backward()                                    # 反向传播（计算梯度）
             nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # 梯度裁剪
