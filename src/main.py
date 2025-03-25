@@ -3,6 +3,7 @@ from torch import nn
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import LambdaLR
+from torch.nn.utils import clip_grad_norm_
 
 import os
 from tqdm import tqdm
@@ -54,13 +55,13 @@ def train(args):
             t = th.randint(0, args.num_timesteps, (args.train_batch_size, 1), device=device)
             x_t = diffusion.diffusion(x_0, noise, t)
 
-            pred_noise = model(x_t, t)                         # 预测噪声
-            loss = criterion(pred_noise, noise)                # 计算损失
-            optimizer.zero_grad()                              # 清空梯度
-            loss.backward()                                    # 反向传播（计算梯度）
-            nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # 梯度裁剪
-            optimizer.step()                                   # 更新模型参数
-            scheduler.step()                                   # 更新学习率
+            pred_noise = model(x_t, t)                # 预测噪声
+            loss = criterion(pred_noise, noise)       # 计算损失
+            optimizer.zero_grad()                     # 清空梯度
+            loss.backward()                           # 反向传播（计算梯度）
+            clip_grad_norm_(model.parameters(), 1.0)  # 梯度裁剪
+            optimizer.step()                          # 更新模型参数
+            scheduler.step()                          # 更新学习率
 
         if SAVE_IMAGE and args.dataset == "heart":
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
