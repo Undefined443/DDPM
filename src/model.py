@@ -19,14 +19,14 @@ class SinusoidalEmbedding(nn.Module):
         self.d = input_dim
         self.scale = scale
         i = self.d // 2
-        emb = th.log(th.Tensor([10000.0])) / (i - 1)
-        emb = th.exp(-emb * th.arange(i))
-        self.emb = nn.Parameter(emb, requires_grad=False)
+        freq = th.log(th.Tensor([10000.0])) / (i - 1)
+        freq = th.exp(-freq * th.arange(i))
+        self.freq = nn.Parameter(freq, requires_grad=False)
 
-    def forward(self, x: th.Tensor):
-        x = x * self.scale
-        emb = x * self.emb.unsqueeze(0)
-        emb = th.cat((th.sin(emb), th.cos(emb)), dim=-1)
+    def forward(self, pos: th.Tensor):
+        pos = pos * self.scale
+        angle = pos * self.freq.unsqueeze(0)
+        emb = th.cat((th.sin(angle), th.cos(angle)), dim=-1)
         return emb
 
 
