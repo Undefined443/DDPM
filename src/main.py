@@ -49,6 +49,7 @@ def train(args):
     print("Training model...")
     for epoch in tqdm(range(args.num_epochs), desc="Epochs"):
         model.train()
+        total_loss = 0.0
         for batch in dataloader:
             x_0 = batch[0].to(device)
             noise = th.randn_like(x_0)
@@ -62,6 +63,7 @@ def train(args):
             clip_grad_norm_(model.parameters(), 1.0)  # 梯度裁剪
             optimizer.step()                          # 更新模型参数
             scheduler.step()                          # 更新学习率
+            total_loss += loss.item()
 
         if SAVE_IMAGE and args.dataset == "heart":
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
@@ -73,25 +75,23 @@ def train(args):
             plt.close(fig)
             SAVE_IMAGE = False
 
-        writer.add_scalar("loss", loss.detach().item(), epoch)
+        avg_loss = total_loss / len(dataloader)
+        writer.add_scalar("loss", avg_loss, epoch)
         writer.add_scalar("learning rate", scheduler.get_last_lr()[0], epoch)
         for name, param in model.named_parameters():
             writer.add_histogram(f"params/{name}", param, epoch)
             if param.grad is not None:
                 writer.add_histogram(f"grads/{name}", param.grad, epoch)
-        if hasattr(model, "time_embed"):
-            t_embed = model.time_embed(t)
-            writer.add_embedding(t_embed, metadata=t.squeeze().tolist(), tag="time_embedding", global_step=epoch)
 
         # 记录最佳模型
-        if loss.detach().item() < best_loss:
-            best_loss = loss.detach().item()
+        if avg_loss < best_loss:
+            best_loss = avg_loss
             best_weights = model.state_dict()
 
-    print("Saving model...")
+    print(f"Saving model to {model_dir}")
     os.makedirs(model_dir, exist_ok=True)
     th.save(best_weights, f"{model_dir}/model_{args.dataset}.pth")
-    writer.add_graph(model, (x_0, t))
+    writer.add_graph(model, [x_0, t])
     writer.add_hparams(vars(args), {"loss": best_loss})
 
     writer.close()
