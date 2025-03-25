@@ -1,16 +1,17 @@
-import os
-from tqdm import tqdm
-from datetime import datetime
-import matplotlib.pyplot as plt
-
-from diffusion import Diffusion
 import torch as th
 from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
+
+import os
+from tqdm import tqdm
+from datetime import datetime
+import matplotlib.pyplot as plt
+import argparse
+
 from model import ToyModel
+from diffusion import Diffusion
 from utils import get_dataset
-from utils import get_args
 
 # animation
 from celluloid import Camera
@@ -33,9 +34,9 @@ def train(args):
     )
 
     model = ToyModel(
-        hidden_dim=args.hidden_size,
-        num_layers=args.hidden_layers,
-        time_emb_dim=args.embedding_size,
+        hidden_dim=args.hidden_dim,
+        num_layers=args.num_layers,
+        time_emb_dim=args.time_emb_dim,
         twoD_data=args.dataset != "mnist",
     )
     model.to(device)
@@ -95,7 +96,7 @@ def train(args):
     th.save(best_weights, f"{model_dir}/model_{args.dataset}.pth")
     writer.add_graph(model, (x_0, t))
     writer.add_hparams(vars(args), {"loss": best_loss})
-    
+
     writer.close()
     return model_dir
 
@@ -107,9 +108,9 @@ def inference(model_dir, args):
         f"{model_dir}/model_{args.dataset}.pth", map_location=device, weights_only=True
     )
     model = ToyModel(
-        hidden_dim=args.hidden_size,
-        num_layers=args.hidden_layers,
-        time_emb_dim=args.embedding_size,
+        hidden_dim=args.hidden_dim,
+        num_layers=args.num_layers,
+        time_emb_dim=args.time_emb_dim,
         twoD_data=args.dataset != "mnist",
     )
     model.to(device)
@@ -189,6 +190,23 @@ def inference(model_dir, args):
         imageio.mimsave(
             f"{model_dir}/animation_mnist.gif", list(denoise_process), fps=5
         )
+
+
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--dataset", type=str, default="heart", choices=["heart", "mnist"]
+    )
+    parser.add_argument("--train_batch_size", type=int, default=32)
+    parser.add_argument("--eval_batch_size", type=int, default=1000)
+    parser.add_argument("--num_epochs", type=int, default=100)
+    parser.add_argument("--learning_rate", type=float, default=1e-3)
+    parser.add_argument("--num_timesteps", type=int, default=200)
+    parser.add_argument("--time_emb_dim", type=int, default=32)
+    parser.add_argument("--hidden_dim", type=int, default=32)
+    parser.add_argument("--num_layers", type=int, default=1)
+    parser.add_argument("--show_image_step", type=int, default=1)
+    return parser.parse_args()
 
 
 if __name__ == "__main__":

@@ -1,6 +1,5 @@
 import torch as th
 from torch.utils.data import TensorDataset
-import argparse
 
 
 def cartesian_heart_dataset(n=8000):
@@ -47,20 +46,3 @@ def get_dataset(name, n=8000):
         return mnist_dataset()
     else:
         raise ValueError(f"Unknown dataset: {name}")
-
-
-def get_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--dataset", type=str, default="heart", choices=["heart", "mnist"]
-    )
-    parser.add_argument("--train_batch_size", type=int, default=32)
-    parser.add_argument("--eval_batch_size", type=int, default=1000)
-    parser.add_argument("--num_epochs", type=int, default=100)
-    parser.add_argument("--learning_rate", type=float, default=1e-3)
-    parser.add_argument("--num_timesteps", type=int, default=200)
-    parser.add_argument("--embedding_size", type=int, default=32)
-    parser.add_argument("--hidden_size", type=int, default=32)
-    parser.add_argument("--hidden_layers", type=int, default=1)
-    parser.add_argument("--show_image_step", type=int, default=1)
-    return parser.parse_args()
