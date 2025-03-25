@@ -3,10 +3,10 @@ from torch import nn
 
 
 class ResBlock(nn.Module):
-    def __init__(self, input_size: int):
+    def __init__(self, input_dim: int):
         super().__init__()
-        self.ln = nn.LayerNorm(input_size)
-        self.ff = nn.Linear(input_size, input_size)
+        self.ln = nn.LayerNorm(input_dim)
+        self.ff = nn.Linear(input_dim, input_dim)
         self.act = nn.GELU()
 
     def forward(self, x: th.Tensor):
@@ -14,13 +14,13 @@ class ResBlock(nn.Module):
 
 
 class SinusoidalEmbedding(nn.Module):
-    def __init__(self, input_size: int, scale: float = 1.0):
+    def __init__(self, input_dim: int, scale: float = 1.0):
         super().__init__()
-        self.size = input_size
+        self.d = input_dim
         self.scale = scale
-        half_size = self.size // 2
-        emb = th.log(th.Tensor([10000.0])) / (half_size - 1)
-        emb = th.exp(-emb * th.arange(half_size))
+        i = self.d // 2
+        emb = th.log(th.Tensor([10000.0])) / (i - 1)
+        emb = th.exp(-emb * th.arange(i))
         self.emb = nn.Parameter(emb, requires_grad=False)
 
     def forward(self, x: th.Tensor):
@@ -33,28 +33,28 @@ class SinusoidalEmbedding(nn.Module):
 class ToyModel(nn.Module):
     def __init__(
         self,
-        hidden_size: int = 128,
-        hidden_layers: int = 3,
-        emb_size: int = 128,
+        hidden_dim: int = 128,
+        num_layers: int = 3,
+        time_emb_dim: int = 128,
         twoD_data: bool = True,
     ):
         super().__init__()
         self.twoD_data = twoD_data
-        self.time_emb = SinusoidalEmbedding(emb_size)
+        self.time_emb = SinusoidalEmbedding(time_emb_dim)
         if twoD_data:  # heart
-            self.input_emb1 = SinusoidalEmbedding(emb_size, scale=25.0)
-            self.input_emb2 = SinusoidalEmbedding(emb_size, scale=25.0)
-            self.concat_size = 2 * emb_size + emb_size  # 2d concat time
-            self.data_size = 2
+            self.input_emb1 = SinusoidalEmbedding(time_emb_dim, scale=25.0)
+            self.input_emb2 = SinusoidalEmbedding(time_emb_dim, scale=25.0)
+            self.concat_size = 2 * time_emb_dim + time_emb_dim  # 2d concat time
+            self.input_dim = 2
         else:  # mnist
-            self.concat_size = 28 * 28 + emb_size  # mnist is 28*28
-            self.data_size = 28 * 28
+            self.concat_size = 28 * 28 + time_emb_dim  # mnist is 28*28
+            self.input_dim = 28 * 28
 
-        layers = [nn.Linear(self.concat_size, hidden_size), nn.GELU()]
-        for _ in range(hidden_layers):
-            layers.append(ResBlock(hidden_size))
-        layers.append(nn.LayerNorm(hidden_size))
-        layers.append(nn.Linear(hidden_size, self.data_size))
+        layers = [nn.Linear(self.concat_size, hidden_dim), nn.GELU()]
+        for _ in range(num_layers):
+            layers.append(ResBlock(hidden_dim))
+        layers.append(nn.LayerNorm(hidden_dim))
+        layers.append(nn.Linear(hidden_dim, self.input_dim))
         self.joint_mlp = nn.Sequential(*layers)
 
     def forward(self, x, t):

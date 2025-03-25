@@ -33,9 +33,9 @@ def train(args):
     )
 
     model = ToyModel(
-        hidden_size=args.hidden_size,
-        hidden_layers=args.hidden_layers,
-        emb_size=args.embedding_size,
+        hidden_dim=args.hidden_size,
+        num_layers=args.hidden_layers,
+        time_emb_dim=args.embedding_size,
         twoD_data=args.dataset != "mnist",
     )
     model.to(device)
@@ -107,16 +107,16 @@ def inference(model_dir, args):
         f"{model_dir}/model_{args.dataset}.pth", map_location=device, weights_only=True
     )
     model = ToyModel(
-        hidden_size=args.hidden_size,
-        hidden_layers=args.hidden_layers,
-        emb_size=args.embedding_size,
+        hidden_dim=args.hidden_size,
+        num_layers=args.hidden_layers,
+        time_emb_dim=args.embedding_size,
         twoD_data=args.dataset != "mnist",
     )
     model.to(device)
     model.load_state_dict(model_weights)
     model.eval()
 
-    x_t = th.randn(args.eval_batch_size, model.data_size, device=device)
+    x_t = th.randn(args.eval_batch_size, model.input_dim, device=device)
     timesteps = range(args.num_timesteps - 1, -1, -1)
     diffusion = Diffusion(num_timesteps=args.num_timesteps, device=device)
     denoise_process = []
