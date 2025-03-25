@@ -55,7 +55,7 @@ def train(args):
             x_t = diffusion.diffusion(x_0, noise, t)
 
             pred_noise = model(x_t, t)                         # 预测噪声
-            loss = criterion(pred_noise, noise)               # 计算损失
+            loss = criterion(pred_noise, noise)                # 计算损失
             optimizer.zero_grad()                              # 清空梯度
             loss.backward()                                    # 反向传播（计算梯度）
             nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # 梯度裁剪
