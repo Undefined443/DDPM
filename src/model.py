@@ -14,9 +14,9 @@ class ResBlock(nn.Module):
 
 
 class SinusoidalEmbedding(nn.Module):
-    def __init__(self, input_dim: int, scale: float = 1.0):
+    def __init__(self, d_model: int, scale: float = 1.0):
         super().__init__()
-        self.d = input_dim
+        self.d = d_model
         self.scale = scale
         i = self.d // 2
         freq = th.log(th.Tensor([10000.0])) / (i - 1)
