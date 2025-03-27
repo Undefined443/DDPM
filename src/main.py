@@ -98,7 +98,7 @@ def train(args):
     return model_dir
 
 
-def inference(model_dir, args):
+def evaluate(model_dir, args):
     print("Evaluate & Save Animation")
     device = "cuda" if th.cuda.is_available() else "cpu"
     model_weights = th.load(f"{model_dir}/model_{args.dataset}.pth", map_location=device, weights_only=True)
@@ -203,4 +203,4 @@ def get_args():
 if __name__ == "__main__":
     args = get_args()
     model_dir = train(args)
-    inference(model_dir, args)
+    evaluate(model_dir, args)
